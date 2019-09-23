@@ -107,13 +107,23 @@ func Call(request []byte, option *Option) ([]byte, error) {
 	var e error
 	var conn net.Conn
 
-	// get conn from pool
-	if option.HasCache() {
-		var ok bool
-		option.l.RLock()
-		conn, ok = option.Cache[connHash]
-		option.l.RUnlock()
-		if !ok {
+	// get conn from pool if exist, otherwise new tcp connection and put it into cache
+	{
+		if option.HasCache() {
+			var ok bool
+			option.l.RLock()
+			conn, ok = option.Cache[connHash]
+			option.l.RUnlock()
+			if !ok {
+				conn, e = net.Dial(option.Network, option.Host)
+				if e != nil {
+					return nil, e
+				}
+				option.l.Lock()
+				option.Cache[connHash] = conn
+				option.l.Unlock()
+			}
+		} else {
 			conn, e = net.Dial(option.Network, option.Host)
 			if e != nil {
 				return nil, e
@@ -121,34 +131,29 @@ func Call(request []byte, option *Option) ([]byte, error) {
 			option.l.Lock()
 			option.Cache[connHash] = conn
 			option.l.Unlock()
-		}
-	} else {
-		conn, e = net.Dial(option.Network, option.Host)
-		if e != nil {
-			return nil, e
-		}
-		option.l.Lock()
-		option.Cache[connHash] = conn
-		option.l.Unlock()
 
-	}
-	if e != nil {
-		return nil, e
+		}
 	}
 
-	if option.KeepAlive == true {
-		go func() {
-			for {
-				select {
-				case <-time.After(option.AliveTime):
-					option.l.Lock()
-					delete(option.Cache, connHash)
-					option.l.Unlock()
-					conn.Close()
+	// If keep connection alive, after alive duration, connection will be closed and remove from cache
+	{
+		if option.KeepAlive == true {
+			go func() {
+				for {
+					select {
+					case <-time.After(option.AliveTime):
+						option.l.Lock()
+						delete(option.Cache, connHash)
+						option.l.Unlock()
+						conn.Close()
+					}
 				}
-			}
-		}()
+			}()
+		}
 	}
+
+
+	// start a goroutine to receive income response
 	go func() {
 		var buf = make([]byte, 512)
 		n, e := conn.Read(buf)
@@ -159,7 +164,10 @@ func Call(request []byte, option *Option) ([]byte, error) {
 		result <- buf[:n]
 		return
 	}()
+	// write request bytes
 	conn.Write(request)
+
+	// If timeout == 0, stuck until result has value , otherwise after timeout interval, return time-out error
 	if option.Timeout == 0 {
 		v := <-result
 		return v, nil
