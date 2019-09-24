@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fwhezfwhez/errorx"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 type H map[string]interface{}
@@ -71,4 +73,14 @@ func MD5(rawMsg string) string {
 	has := md5.Sum(data)
 	md5str1 := fmt.Sprintf("%x", has)
 	return strings.ToUpper(md5str1)
+}
+
+func RandomString(length int) string{
+	str := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var result string
+	for i := 0; i < length; i++ {
+		result += string(str[r.Intn(len(str))])
+	}
+	return result
 }
