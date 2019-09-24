@@ -32,6 +32,8 @@ Supporting protocols
     - [2.5 Pack-detail](#25-pack-detail)
     - [2.6 Chat](#26-chat)
     - [2.7 Raw](#27-raw)
+    - [2.8 ClientPool](#28-clientpool)
+    - [2.9 Auth](#29-auth)
 - [3. Ussages](#3-ussages)
   - [3.1 How to add middlewares?](#31-how-to-add-middlewares)
   - [3.2 When to use OnMessage callback?](#32-when-to-use-onmessage-callback)
@@ -166,6 +168,13 @@ Tcpx has its built-in pool to help manage online and offline users. Note that :
 - To online/offline a user, you can do it like `ctx.Offline()`,`ctx.Online(username string)`.
 
 Official built-in pool will not extend much. If it doesn't fit your requirement, you should design your own pool.
+
+#### 2.9 Auth
+https://github.com/fwhezfwhez/tcpx/tree/master/examples/modules/auth
+
+Auth makes different sense comparing with middleware. A middleware can easily stop a invalid request after a connection has been established, but It can't avoid a client keep sending heartbeat but do nothing.It still occupy a connection resource.
+
+Auth will start a goroutine once a connection is on. In a specific interval not receiving signal, connection will be forcely dropped by server side.
 
 ## 3. Ussages
 Now tcpx advises two modes handling stream, using OnMessage requires user handling stream by himself
