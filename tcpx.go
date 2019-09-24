@@ -566,6 +566,7 @@ func (tcpx *TcpX) ListenAndServeUDP(network, addr string, maxBufferSize ...int) 
 			if tcpx.State() == STATE_STOP {
 				break
 			}
+
 			// read from udp conn
 			buffer, addr, e = ReadAllUDP(conn, maxBufferSize...)
 
