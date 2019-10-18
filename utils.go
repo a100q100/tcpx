@@ -7,6 +7,7 @@ import (
 	"github.com/fwhezfwhez/errorx"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -75,12 +76,69 @@ func MD5(rawMsg string) string {
 	return strings.ToUpper(md5str1)
 }
 
-func RandomString(length int) string{
+func RandomString() string {
 	str := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var r *rand.Rand
+	var once = sync.Once{}
+	once.Do(func() {
+		r = rand.New(rand.NewSource(time.Now().UnixNano()))
+	})
 	var result string
-	for i := 0; i < length; i++ {
+	for i := 0; i < 32; i++ {
 		result += string(str[r.Intn(len(str))])
 	}
 	return result
+}
+
+func RetryHandler(n int, f func() (bool, error)) error {
+	ok, er := f()
+	if ok && er == nil {
+		return nil
+	}
+	if n-1 > 0 {
+		return RetryHandler(n-1, f)
+	}
+	return er
+}
+
+// Execute f() n times, each time on fail will keep specific interval in order of `secondIntervals`
+// If n < 0, it will forever execute f(), interval will used in order of `secondIntervals` and keep using the last interval element at last.
+// Work in serial.
+func RetryHandlerWithInterval(n int, f func() (bool, error), secondIntervals ... int) error {
+	var offset = 0
+	var ok bool
+	var e error
+	return retryHandlerWithIntervalOffset(&ok, &e, n, f, &offset, secondIntervals...)
+}
+
+// sub function of RetryHandlerWithInterval
+func retryHandlerWithIntervalOffset(ok *bool, e *error, n int, f func() (bool, error), offset *int, secondIntervals ... int) error {
+	if n == 0 {
+		return nil
+	}
+	*ok, *e = f()
+	if *ok && *e == nil {
+		return nil
+	}
+
+	if n-1 > 0 && !(n < 0) {
+		if *offset < len(secondIntervals) {
+			time.Sleep(time.Duration(secondIntervals[*offset]) * time.Second)
+			if *offset < len(secondIntervals)-1 {
+				*offset ++
+			}
+		}
+		return retryHandlerWithIntervalOffset(ok, e, n-1, f, offset, secondIntervals...)
+	} else {
+		if n != 1 {
+			if *offset < len(secondIntervals) {
+				time.Sleep(time.Duration(secondIntervals[*offset]) * time.Second)
+				if *offset < len(secondIntervals)-1 {
+					*offset ++
+				}
+			}
+			return retryHandlerWithIntervalOffset(ok, e, n, f, offset, secondIntervals...)
+		}
+	}
+	return *e
 }

@@ -27,3 +27,18 @@ func (msg Message) Get(key string) interface{} {
 func (msg *Message) Set(k string, v interface{}) {
 	msg.Header[k] = v
 }
+
+// Set marshal name.Advised :
+// - msg.SetMarshalName(tcpx.JSON)
+// - msg.SetMarshalName(tcpx.PROTOBUF)
+// - msg.SetMarshalName(tcpx.XML)
+// - msg.SetMarshalName(tcpx.TOML)
+// - msg.SetMarshalName(tcpx.YAML)
+func (msg *Message) SetMarshalName(marshalName string) Message{
+	if msg.Header == nil {
+		msg.Header = make(map[string]interface{})
+	}
+
+	msg.Header["tcpx-marshal-name"] = marshalName
+	return *msg
+}

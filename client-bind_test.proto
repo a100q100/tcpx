@@ -1,0 +1,6 @@
+syntax = "proto3";
+package tcpx;
+
+message Hello {
+    string message =1;
+}

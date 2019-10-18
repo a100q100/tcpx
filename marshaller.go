@@ -11,6 +11,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	JSON     = "json"
+	PROTOBUF = "protobuf"
+	XML      = "xml"
+	TOML     = "toml"
+	YAML     = "yaml"
+)
+
 type Marshaller interface {
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
@@ -31,6 +39,23 @@ func GetMarshallerByMarshalName(marshalName string) (Marshaller, error) {
 		return ProtobufMarshaller{}, nil
 	default:
 		return nil, errors.New(fmt.Sprintf("unknown marshalName %s,requires in [json,xml,toml,yaml,protobuf]", marshalName))
+	}
+}
+
+func GetMarshallerByMarshalNameDefaultJSON(marshalName string) (Marshaller) {
+	switch marshalName {
+	case "json":
+		return JsonMarshaller{}
+	case "xml":
+		return XmlMarshaller{}
+	case "toml", "tml":
+		return TomlMarshaller{}
+	case "yaml", "yml":
+		return YamlMarshaller{}
+	case "protobuf", "proto":
+		return ProtobufMarshaller{}
+	default:
+		return JsonMarshaller{}
 	}
 }
 

@@ -1,204 +1,148 @@
 package tcpx
-
+// Unstable, do not use
 import (
 	"fmt"
 	"github.com/fwhezfwhez/errorx"
+	"io"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 )
 
-// Call args
-// Option is a context used in Call().It provide url connection cache and can config client configurations like timeout, keepAlive...
 type Option struct {
-	// Help unique request_id
-	Salt string
-
-	// key: network://host
-	// Cache helps store alive connections
-	Cache map[string]net.Conn
-	l     *sync.RWMutex
-	// key: network://host:randomStr
-	// RequestMap helps define request_id for the same connection
-	RequestMap map[string]chan []byte
-	l2         *sync.RWMutex
-
-	Network string
-	Host    string
-
-	Timeout    time.Duration
 	Marshaller Marshaller
 
-	KeepAlive bool
-	AliveTime time.Duration
+	requestMap sync.Map
+	offset     int
+	l          *sync.RWMutex
+
+	host, network string
+	autoConnect   bool
+	pingInterval  time.Duration
+	conn          net.Conn
+
+	reconnect chan struct{}
 }
 
-// init an empty option
-func OptionTODO() *Option {
+func OptionTODO(network string, host string) *Option {
 	return &Option{
-		Cache:      make(map[string]net.Conn, 0),
+		requestMap: sync.Map{},
+		offset:     0,
 		l:          &sync.RWMutex{},
-		RequestMap: make(map[string]chan []byte, 0),
-		l2:         &sync.RWMutex{},
+		host:       host,
+		network:    network,
+
+		reconnect: make(chan struct{}, 10),
 	}
 }
+func (o *Option) SetMarshaller(m Marshaller) {
+	if m == nil {
+		m = JsonMarshaller{}
+	}
+	o.Marshaller = m
+}
 
-// Set option network and host
-func (o *Option) SetNetworkHost(network, host string) *Option {
-	o.Network = network
-	o.Host = host
+func (o *Option) AutoConnect(auto bool, pingInterval time.Duration) *Option {
+	o.autoConnect = auto
+	o.pingInterval = pingInterval
 	return o
 }
 
-// Set option timout
-func (o *Option) SetTimeout(timeout time.Duration) *Option {
-	o.Timeout = timeout
-	return o
-}
+func (o *Option) InitConnection() error {
+	conn, e := net.Dial(o.network, o.host)
 
-// Set option keepAlive
-func (o *Option) SetKeepAlive(alive bool, timeout time.Duration) *Option {
-	o.KeepAlive = alive
-	o.AliveTime = timeout
-	return o
-}
-
-// Use option's non-empty value and set it into o
-func (o *Option) Option(option Option) *Option {
-	if option.Host != "" {
-		o.Host = option.Host
+	if e != nil {
+		return errorx.Wrap(e)
 	}
-	if option.Network != "" {
-		o.Network = option.Network
-	}
-	if option.Timeout != 0 {
-		o.Timeout = option.Timeout
-	}
+	o.conn = conn
 
-	if option.KeepAlive != false {
-		o.KeepAlive = option.KeepAlive
-	}
-	if option.Marshaller != nil {
-		o.Marshaller = option.Marshaller
-	}
-
-	if option.AliveTime != 0 {
-		o.AliveTime = option.AliveTime
-	}
-	return o
-}
-
-// Copy an option instance for different request
-func (o *Option) Copy() *Option {
-	return &Option{
-		Network: o.Network,
-		Host:    o.Host,
-		Cache:   o.Cache,
-		Timeout: o.Timeout,
-
-		Marshaller: o.Marshaller,
-
-		KeepAlive: o.KeepAlive,
-		AliveTime: o.AliveTime,
-	}
-}
-
-// Check an option has existing host connection cache
-func (o *Option) HasCache() bool {
-	o.l.RLock()
-	defer o.l.RUnlock()
-	return len(o.Cache) > 0
-}
-
-// Call require client send a request and server response once
-//
-// Deprecated: unstable, do not use.
-func Call(request []byte, option *Option) ([]byte, error) {
-	if option.Salt == "" {
-		option.Salt = "tcpx"
-	}
-	connHash := fmt.Sprintf("%s://%s", option.Network, option.Host)
-	requestHash := fmt.Sprintf("%s:%s:%s:%s", connHash, option.Salt, strconv.FormatInt(time.Now().UnixNano(), 10), RandomString(32))
-	var e error
-	var conn net.Conn
-
-	// get conn from pool if exist, otherwise new tcp connection and put it into cache
-	var ok bool
-	func() {
-		option.l.Lock()
-		defer option.l.Unlock()
-		conn, ok = option.Cache[connHash]
-		if !ok {
-			conn, e = net.Dial(option.Network, option.Host)
+	go func() {
+		for {
+			stream, e := FirstBlockOf(o.conn)
 			if e != nil {
-				fmt.Println(errorx.Wrap(e))
-				return
+				if e == io.EOF {
+					if o.autoConnect == true {
+						<-o.reconnect
+						continue
+					} else {
+						return
+					}
+				}
+				fmt.Println(errorx.Wrap(e).Error())
 			}
-			option.Cache[connHash] = conn
-
-			go func() {
-				buf, e := FirstBlockOf(conn)
+			go func(stream []byte) {
+				requestId, e := RequestIDOf(stream)
 				if e != nil {
-					fmt.Println(errorx.Wrap(e))
+					fmt.Println(errorx.Wrap(e).Error())
 					return
 				}
-				option.l2.RLock()
-				option.RequestMap[requestHash] <- buf
-				option.l2.RUnlock()
-				return
-			}()
+				if requestId == "" {
+					return
+				}
+				tmp, ok := o.requestMap.Load(requestId)
+				if !ok {
+					fmt.Println("not found result chanel for requestID " + requestId)
+					return
+				}
+				c, ok := tmp.(chan []byte)
+				if !ok {
+					fmt.Println("bad chan type for requestID" + requestId)
+					return
+				}
+				c <- stream
+			}(stream)
 		}
 	}()
 
-	// init response chanel
-	option.l2.Lock()
-	option.RequestMap[requestHash] = make(chan []byte, 1)
-	option.l2.Unlock()
-	defer func() {
-		option.l2.Lock()
-		defer option.l2.Unlock()
-		delete(option.RequestMap, requestHash)
-	}()
+	if o.autoConnect == true {
+		go func() {
+			ping := PackStuff(DEFAULT_PING_MESSAGEID)
+			reConnect := func() (bool, error) {
+				o.conn, e = net.Dial(o.network, o.host)
+				if e != nil {
+					return false, e
+				}
+				return true, nil
+			}
 
-	//// If keep connection alive, after alive duration, connection will be closed and remove from cache
-	//{
-	//	if option.KeepAlive == true {
-	//		go func() {
-	//			for {
-	//				select {
-	//				case <-time.After(option.AliveTime):
-	//					option.l.Lock()
-	//					delete(option.Cache, connHash)
-	//					option.l.Unlock()
-	//					conn.Close()
-	//				}
-	//			}
-	//		}()
-	//	}
-	//}
+			for {
+				_, e := o.conn.Write(ping)
+				if e != nil {
+					// Logger.Println(errorx.Wrap(e))
+					e := RetryHandlerWithInterval(-1, reConnect, 3, 3, 10, 10, 30, 30, 30, 60, 60, 5*60)
+					if e == nil {
+						o.reconnect <- struct{}{}
+					}
+				}
 
-	// start a goroutine to receive income response
+				time.Sleep(o.pingInterval)
+				continue
+			}
+		}()
+	}
+	return nil
+}
+func Call(request Message, option *Option) ([]byte, error) {
+	option.l.Lock()
+	option.offset ++
+	requestId := fmt.Sprintf("%s://%s/%d", option.network, option.host, option.offset)
+	option.l.Unlock()
 
-	// write request bytes
-	if _, e := conn.Write(request); e != nil {
-		fmt.Println(errorx.Wrap(e))
+	request.Set("tcpx-request-id", requestId)
+
+	var result = make(chan []byte, 1)
+	option.requestMap.Store(requestId, result)
+
+	buf, e := PackWithMarshaller(request, option.Marshaller)
+	if e != nil {
 		return nil, errorx.Wrap(e)
 	}
+	option.conn.Write(buf)
 
-	// If timeout == 0, stuck until result has value , otherwise after timeout interval, return time-out error
-	var c chan []byte
-	option.l2.RLock()
-	c = option.RequestMap[requestHash]
-	option.l2.RUnlock()
-	if option.Timeout == 0 {
-		return <-c, nil
-	} else {
-		select {
-		case <-time.After(option.Timeout):
-			return nil, fmt.Errorf("time out")
-		case v := <-c:
-			return v, nil
-		}
+	select {
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("time out")
+	case v := <-result:
+		return v, nil
 	}
 }

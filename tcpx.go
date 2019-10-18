@@ -25,10 +25,17 @@ import (
 const (
 	DEFAULT_HEARTBEAT_MESSAGEID = 1392
 	DEFAULT_AUTH_MESSAGEID      = 1393
+	DEFAULT_PING_MESSAGEID      = 1394
 
 	STATE_RUNNING = 1
 	STATE_STOP    = 2
 )
+
+var IgnoredReplyMessageID = []int{
+	DEFAULT_HEARTBEAT_MESSAGEID,
+	DEFAULT_AUTH_MESSAGEID,
+	DEFAULT_PING_MESSAGEID,
+}
 
 // OnMessage and mux are opposite.
 // When OnMessage is not nil, users should deal will ctx.Stream themselves.
@@ -1001,6 +1008,7 @@ func (tcpx *TcpX) closeAllConnection() {
 
 // Graceful start an existed tcpx srv, former server is stopped by tcpX.Stop()
 func (tcpx *TcpX) Start() error {
+	fmt.Println("graceful start")
 	if tcpx.State() == STATE_RUNNING {
 		return errors.New("already running")
 	}
@@ -1013,9 +1021,16 @@ func (tcpx *TcpX) Start() error {
 				}
 			}()
 			fmt.Println(fmt.Sprintf("graceful restart %s server on %s", v.Network, v.Port))
-			e := tcpx.ListenAndServe(v.Network, v.Port)
-			if e != nil {
-				Logger.Println(fmt.Sprintf("%s \n %s", e.Error(), debug.Stack()))
+			if tcpx.HandleRaw != nil {
+				e := tcpx.ListenAndServeRaw(v.Network, v.Port)
+				if e != nil {
+					Logger.Println(fmt.Sprintf("%s \n %s", e.Error(), debug.Stack()))
+				}
+			} else {
+				e := tcpx.ListenAndServe(v.Network, v.Port)
+				if e != nil {
+					Logger.Println(fmt.Sprintf("%s \n %s", e.Error(), debug.Stack()))
+				}
 			}
 		}()
 	}

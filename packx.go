@@ -24,7 +24,6 @@ var PackXML = NewPackx(XmlMarshaller{})
 var PackYAML = NewPackx(YamlMarshaller{})
 var PackProtobuf = NewPackx(ProtobufMarshaller{})
 
-
 // New a packx instance, specific a marshaller for communication.
 // If marshaller is nil, official jsonMarshaller is put to used.
 func NewPackx(marshaller Marshaller) *Packx {
@@ -49,7 +48,8 @@ func (packx Packx) Pack(messageID int32, src interface{}, headers ... map[string
 			header [k1] = v1
 		}
 	}
-	return PackWithMarshaller(Message{MessageID: messageID, Header: header, Body: src}, packx.Marshaller)
+	var message = (&Message{MessageID: messageID, Header: header, Body: src}).SetMarshalName(packx.Marshaller.MarshalName())
+	return PackWithMarshaller(message, packx.Marshaller)
 }
 
 // PackWithBody is used for self design protocol
@@ -91,28 +91,29 @@ func (packx Packx) FirstBlockOf(r io.Reader) ([]byte, error) {
 }
 
 // returns the first block's messageID, header, body marshalled stream, error.
-func UnPackFromReader(r io.Reader) (int32, map[string]interface{}, []byte, error){
-	buf,e:= UnpackToBlockFromReader(r)
-	if e!=nil {
-		return 0, nil, nil, e
-	}
-	
-	messageID, e:= MessageIDOf(buf)
-	if e!=nil {
+func UnPackFromReader(r io.Reader) (int32, map[string]interface{}, []byte, error) {
+	buf, e := UnpackToBlockFromReader(r)
+	if e != nil {
 		return 0, nil, nil, e
 	}
 
-	header ,e:= HeaderOf(buf)
-	if e!=nil {
+	messageID, e := MessageIDOf(buf)
+	if e != nil {
 		return 0, nil, nil, e
 	}
 
-	body,e := BodyBytesOf(buf)
-	if e!=nil {
+	header, e := HeaderOf(buf)
+	if e != nil {
 		return 0, nil, nil, e
 	}
-    return messageID, header, body, nil
-} 
+
+	body, e := BodyBytesOf(buf)
+	if e != nil {
+		return 0, nil, nil, e
+	}
+	return messageID, header, body, nil
+}
+
 // Since FirstBlockOf has nothing to do with packx instance, so make it alone,
 // for old usage remaining useful, old packx.FirstBlockOf is still useful
 func FirstBlockOf(r io.Reader) ([]byte, error) {
@@ -141,6 +142,7 @@ func FirstBlockOfBytes(buffer []byte) ([]byte, error) {
 func (packx Packx) MessageIDOf(stream []byte) (int32, error) {
 	return MessageIDOf(stream)
 }
+
 // messageID of a stream.
 // Use this to choose which struct for unpacking.
 func MessageIDOf(stream []byte) (int32, error) {
@@ -156,6 +158,7 @@ func MessageIDOf(stream []byte) (int32, error) {
 func (packx Packx) LengthOf(stream []byte) (int32, error) {
 	return LengthOf(stream)
 }
+
 // Length of the stream starting validly.
 // Length doesn't include length flag itself, it refers to a valid message length after it.
 func LengthOf(stream []byte) (int32, error) {
@@ -170,8 +173,11 @@ func LengthOf(stream []byte) (int32, error) {
 func (packx Packx) HeaderLengthOf(stream []byte) (int32, error) {
 	return HeaderLengthOf(stream)
 }
+
 // Header length of a stream received
+// [4] len, [4]messageID ,[4] headerLen
 func HeaderLengthOf(stream []byte) (int32, error) {
+
 	if len(stream) < 12 {
 		return 0, errors.New(fmt.Sprintf("stream lenth should be bigger than 12"))
 	}
@@ -197,8 +203,9 @@ func BodyLengthOf(stream []byte) (int32, error) {
 func (packx Packx) HeaderBytesOf(stream []byte) ([]byte, error) {
 	return HeaderBytesOf(stream)
 }
+
 // Header bytes of a block
-func  HeaderBytesOf(stream []byte) ([]byte, error) {
+func HeaderBytesOf(stream []byte) ([]byte, error) {
 	headerLen, e := HeaderLengthOf(stream)
 	if e != nil {
 		return nil, e
@@ -210,13 +217,45 @@ func  HeaderBytesOf(stream []byte) ([]byte, error) {
 	return header, nil
 }
 
+func RequestIDOf(stream []byte) (string, error) {
+	header, e := HeaderOf(stream)
+	if e != nil {
+		return "", errorx.Wrap(e)
+	}
+	requestID, exist := header["tcpx-request-id"]
+	if !exist {
+		return "", errorx.NewFromString("not found request-id key 'tcpx-request-id'")
+	}
+	str, ok := requestID.(string)
+	if !ok {
+		return "", errorx.NewFromString("request_id is not a string type")
+	}
+	return str, nil
+}
+
+func MustRequestIDOf(stream []byte) string {
+	header, e := HeaderOf(stream)
+	if e != nil {
+		return ""
+	}
+	requestID, exist := header["tcpx-request-id"]
+	if !exist {
+		return ""
+	}
+	str, ok := requestID.(string)
+	if !ok {
+		return ""
+	}
+	return str
+}
+
 // header of a block
 func (packx Packx) HeaderOf(stream []byte) (map[string]interface{}, error) {
 	return HeaderOf(stream)
 }
 
 // header of a block
-func  HeaderOf(stream []byte) (map[string]interface{}, error) {
+func HeaderOf(stream []byte) (map[string]interface{}, error) {
 	var header map[string]interface{}
 	headerBytes, e := HeaderBytesOf(stream)
 	if e != nil {
@@ -269,6 +308,7 @@ func BodyBytesOf(stream []byte) ([]byte, error) {
 // []byte -- header              marshal by json
 // []byte -- body                marshal by marshaller
 func PackWithMarshaller(message Message, marshaller Marshaller) ([]byte, error) {
+	message.SetMarshalName(marshaller.MarshalName())
 	if marshaller == nil {
 		marshaller = JsonMarshaller{}
 	}
@@ -285,7 +325,7 @@ func PackWithMarshaller(message Message, marshaller Marshaller) ([]byte, error) 
 		return nil, e
 	}
 	binary.BigEndian.PutUint32(headerLengthBuf, uint32(len(headerBuf)))
-	if message.Body!=nil{
+	if message.Body != nil {
 		bodyBuf, e = marshaller.Marshal(message.Body)
 		if e != nil {
 			return nil, e
@@ -327,6 +367,7 @@ func PackWithMarshallerName(message Message, marshallerName string) ([]byte, err
 	default:
 		return nil, errors.New("only accept ['json', 'xml', 'toml','yaml','protobuf']")
 	}
+
 	return PackWithMarshaller(message, marshaller)
 }
 
@@ -355,7 +396,7 @@ func UnpackWithMarshaller(stream []byte, dest interface{}, marshaller Marshaller
 	bodyLength := binary.BigEndian.Uint32(stream[12:16])
 	// header
 	var header map[string]interface{}
-	if headerLength!=0 {
+	if headerLength != 0 {
 		e = json.Unmarshal(stream[16:(16 + headerLength)], &header)
 		if e != nil {
 			return Message{}, e
@@ -363,7 +404,7 @@ func UnpackWithMarshaller(stream []byte, dest interface{}, marshaller Marshaller
 	}
 
 	// body
-	if bodyLength!=0 {
+	if bodyLength != 0 {
 		e = marshaller.Unmarshal(stream[16+headerLength:(16 + headerLength + bodyLength)], dest)
 		if e != nil {
 			return Message{}, e
@@ -441,6 +482,7 @@ func UnpackToBlockFromReader(reader io.Reader) ([]byte, error) {
 
 	return append(info, content ...), nil
 }
+
 // This method is used to pack message whose body is well-marshaled.
 func PackWithMarshallerAndBody(message Message, body []byte) ([]byte, error) {
 	var e error
@@ -475,22 +517,36 @@ func PackWithMarshallerAndBody(message Message, body []byte) ([]byte, error) {
 	return packet, nil
 }
 
-func PackHeartbeat()[]byte{
-    buf,e:= PackWithMarshallerAndBody(Message{
-    	MessageID:DEFAULT_HEARTBEAT_MESSAGEID,
-	},nil)
-    if e!=nil{
-    	panic(e)
+func PackHeartbeat() []byte {
+	buf, e := PackWithMarshallerAndBody(Message{
+		MessageID: DEFAULT_HEARTBEAT_MESSAGEID,
+	}, nil)
+	if e != nil {
+		panic(e)
 	}
-    return buf
+	return buf
 }
 
 // pack short signal which only contains messageID
-func PackStuff(messageID int32)[]byte{
-	buf,e:= PackWithMarshallerAndBody(Message{
-		MessageID:messageID,
-	},nil)
-	if e!=nil{
+// heartbeat uses this function
+func PackStuff(messageID int32) []byte {
+	buf, e := PackWithMarshallerAndBody(Message{
+		MessageID: messageID,
+	}, nil)
+	if e != nil {
+		panic(e)
+	}
+	return buf
+}
+
+func PackStuffWithRequestID(messageID int32, requestID string) []byte {
+	buf, e := PackWithMarshallerAndBody(Message{
+		MessageID: messageID,
+		Header: map[string]interface{}{
+			"tcpx-request-id": requestID,
+		},
+	}, nil)
+	if e != nil {
 		panic(e)
 	}
 	return buf

@@ -1,0 +1,3 @@
+center:
+  tcp_port: :8999
+  register_host: http://localhost:6666
