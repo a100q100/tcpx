@@ -5,7 +5,7 @@ A config management broker.
 
 #### configs
 - Support config version control(rollback).
-- Support environment control(different config file among dev/pro/local).
+- Support environment control(different config value among dev/pro/local).
 
 #### publish
 - Support client request in intervals.

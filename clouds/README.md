@@ -1,6 +1,11 @@
 ## Declaration
 This system is an example of using tcpx.It advises but not force users to design your system like this.
 
+## Distribute Design
+<p align="center">
+    <a href="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"><img src="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"></a>
+</p>
+
 ## Server brokers
 Server are divided into brokers: center, register, userPool. They works below.
 
