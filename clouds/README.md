@@ -2,11 +2,15 @@
 This system is an example of using tcpx.It advises but not force users to design your system like this.
 
 ## Distribute Design
+
 **中文版**:
+
 <p align="center">
     <a href="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"><img src="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"></a>
 </p>
+
 **English**:
+
 <p align="center">
     <a href="https://user-images.githubusercontent.com/36189053/67372543-a56dda80-f5b0-11e9-915f-2abea11f39c2.png"><img src="https://user-images.githubusercontent.com/36189053/67372543-a56dda80-f5b0-11e9-915f-2abea11f39c2.png"></a>
 </p>
