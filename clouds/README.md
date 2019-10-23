@@ -2,12 +2,24 @@
 This system is an example of using tcpx.It advises but not force users to design your system like this.
 
 ## Distribute Design
+**中文版**:
 <p align="center">
-    中文版:
     <a href="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"><img src="https://user-images.githubusercontent.com/36189053/67370908-1eb7fe00-f5ae-11e9-8d7a-69e1075afbfe.png"></a>
-    English:
+</p>
+**English**:
+<p align="center">
     <a href="https://user-images.githubusercontent.com/36189053/67372543-a56dda80-f5b0-11e9-915f-2abea11f39c2.png"><img src="https://user-images.githubusercontent.com/36189053/67372543-a56dda80-f5b0-11e9-915f-2abea11f39c2.png"></a>
 </p>
+
+#### Explain
+- **Active line with arrow** means clients straightly request to a server broker.
+- **Dotted line with arrow** means interfering among inner server brokers.
+- **Big square frame** means sub-clouds with brokers
+
+#### Advantages
+- Scalable.Each broker/sub-cloud can be easily horizontally scale out to balance big amount of requests.
+- Strong availability. Certain broker fail does not influence cloud running.
+- Service extensible. Can harmlessly extend services.
 
 ## Server brokers
 Server are divided into brokers: center, register, userPool. They works below.
