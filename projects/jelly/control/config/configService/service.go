@@ -96,3 +96,66 @@ func HTTPAddConfig (c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"message": "success", "data": param})
 }
+
+// Auto generate by github.com/fwhezfwhez/model_convert.GenerateDeleteOneAPI().
+func HTTPDeleteConfig(c *gin.Context) {
+	id := c.Param("id")
+	idInt, e := strconv.Atoi(id)
+	if e!=nil {
+		c.JSON(400, gin.H{"message": fmt.Sprintf("param 'id' requires int but got %s", id)})
+		return
+	}
+	var count int
+	if e:=db.DB.Model(&configModel.Config{}).Where("id=?", idInt).Count(&count).Error; e!=nil {
+		log.Println(e)
+		c.JSON(500, gin.H{"message": errorx.Wrap(e).Error()})
+		return
+	}
+	if count ==0 {
+		c.JSON(200, gin.H{"message": fmt.Sprintf("id '%s' record not found", id)})
+		return
+	}
+	var instance configModel.Config
+	if e:=db.DB.Model(&configModel.Config{}).Where("id=?", id).Delete(&instance).Error; e!=nil {
+		log.Println(e)
+		c.JSON(500, gin.H{"message": errorx.Wrap(e).Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "success"})
+}
+
+// Auto generate by github.com/fwhezfwhez/model_convert.GenerateUpdateOneAPI().
+func HTTPUpdateConfig(c *gin.Context) {
+	id := c.Param("id")
+	idInt, e := strconv.Atoi(id)
+	if e!=nil {
+		c.JSON(400, gin.H{"message": fmt.Sprintf("param 'id' requires int but got %s", id)})
+		return
+	}
+	var count int
+	if e:=db.DB.Model(&configModel.Config{}).Where("id=?", idInt).Count(&count).Error; e!=nil {
+		log.Println(e)
+		c.JSON(500, gin.H{"message": errorx.Wrap(e).Error()})
+		return
+	}
+	if count ==0 {
+		c.JSON(200, gin.H{"message": fmt.Sprintf("id '%s' record not found", id)})
+		return
+	}
+	var param configModel.Config
+	if e:=c.Bind(&param);e!=nil {
+		c.JSON(400, gin.H{"message": errorx.Wrap(e).Error()})
+		return
+	}
+
+	if !util.IfZero(param.Id) {
+		c.JSON(400, gin.H{"message": "field 'Id' can't be modified'"})
+		return
+	}
+	if e:=db.DB.Model(&configModel.Config{}).Where("id=?", id).Updates(param).Error; e!=nil {
+		log.Println(e)
+		c.JSON(500, gin.H{"message": errorx.Wrap(e).Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "success"})
+}

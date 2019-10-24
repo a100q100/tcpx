@@ -13,7 +13,6 @@ import (
 )
 
 var DB *gorm.DB
-var PQDB *sql.DB
 
 func init() {
 	// 初始化数据库orm连接
@@ -75,11 +74,4 @@ func init() {
 		}
 	}(dbConfig)
 
-	// 初始化pq驱动,用于CopyIn
-	PQDB, err = sql.Open("postgres", dbConfig)
-	PQDB.SetConnMaxLifetime(10 * time.Second)
-	PQDB.SetMaxIdleConns(1)
-	if err != nil {
-		panic(err)
-	}
 }

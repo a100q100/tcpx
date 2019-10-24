@@ -1,6 +1,0 @@
-db:
-  host: localhost
-  user: postgres
-  dbname: jelly
-  sslmode: disable
-  password: 123

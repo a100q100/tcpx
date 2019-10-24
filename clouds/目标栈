@@ -1,0 +1,11 @@
+本文记载需要达到的小目标。
+
+- Center 支持pool id 长连接缓存，而不是每次都Dial
+- 所有broker制作成端口数据库可配置
+- 协议支持json和protobuf
+- 项目架构要分离，便于团队开发
+- 增加消息持久层broker
+- 以IM的要求为原型，开发具备最低为IM级别的TCP-CLOUD.
+- 添加Jelly配置中心broker
+- 添加消息队列broker
+- 待添

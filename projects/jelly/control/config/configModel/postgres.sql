@@ -5,4 +5,4 @@ create table config(
   data_string varchar,
   env varchar not null default '',
   unique(config_id, env)
-)
+);

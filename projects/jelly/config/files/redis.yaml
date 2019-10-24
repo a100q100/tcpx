@@ -1,0 +1,11 @@
+# redis config. read can be extensive.
+
+## if set true, redis will work as independent db, rather than cache.It's like postgres, mysql
+asdb: true
+## if set true, redis config will make effect and init redis pool instance.
+enable: false
+## redis cloud urls.One write and many read.If single node, set write and read url the same. Read node should set at least one.
+write: redis://localhost:6379
+read:
+- redis://localhost:6379
+- redis://localhost:6379

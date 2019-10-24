@@ -1,0 +1,22 @@
+# postgres config
+
+## If set true, postgres will be activate and init postgres db instance.
+## If only one single node of postgres, set read at least one length and config the same as write
+enable: true
+write:
+  host: localhost
+  user: postgres
+  dbname: jelly
+  sslmode: disable
+  password: "123"
+read:
+- host: localhost
+  user: postgres
+  dbname: jelly
+  sslmode: disable
+  password: "123"
+- host: localhost
+  user: postgres
+  dbname: jelly
+  sslmode: disable
+  password: "123"

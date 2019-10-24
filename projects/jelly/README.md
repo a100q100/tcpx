@@ -3,6 +3,9 @@ A config management broker.
 
 ## Smarty
 
+#### DB
+- Support postgres, redis
+
 #### configs
 - Support config version control(rollback).
 - Support environment control(different config value among dev/pro/local).
